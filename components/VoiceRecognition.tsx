@@ -16,6 +16,9 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 
+// Import voice for mobile
+const Voice = Platform.OS !== 'web' ? require('@react-native-community/voice').default : null;
+
 interface VoiceRecognitionProps {
   onVoiceResult: (text: string) => void;
   onListeningChange: (isListening: boolean) => void;
@@ -39,9 +42,41 @@ export default function VoiceRecognition({
 }: VoiceRecognitionProps) {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const waveAnimation = useSharedValue(0);
   const micAnimation = useSharedValue(1);
+
+  const waveAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: waveAnimation.value,
+  }));
+
+  const micAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: micAnimation.value }],
+  }));
+
+  // --- Voice Recognition Handlers ---
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    if (!Voice) return;
+    Voice.onSpeechResults = (e: any) => {
+      setIsListening(false);
+      setIsProcessing(false);
+      onListeningChange(false);
+      if (e.value && e.value.length > 0) {
+        onVoiceResult(e.value[0]);
+      }
+    };
+    Voice.onSpeechError = (e: any) => {
+      setIsListening(false);
+      setIsProcessing(false);
+      setError('Voice error: ' + (e.error?.message || 'Unknown error'));
+      onListeningChange(false);
+    };
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
 
   useEffect(() => {
     if (isListening) {
@@ -69,39 +104,79 @@ export default function VoiceRecognition({
     }
   }, [isListening]);
 
-  const waveAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: waveAnimation.value,
-  }));
-
-  const micAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: micAnimation.value }],
-  }));
-
+  // --- Start Listening ---
   const startListening = async () => {
+    setError(null);
     if (!isEnabled) return;
-    
     setIsListening(true);
+    setIsProcessing(false);
     onListeningChange(true);
-    
-    // Simulate voice recognition
-    setTimeout(() => {
-      setIsListening(false);
-      setIsProcessing(true);
-      
-      // Simulate processing time
-      setTimeout(() => {
-        const randomResponse = VOICE_RESPONSES[Math.floor(Math.random() * VOICE_RESPONSES.length)];
-        onVoiceResult(randomResponse);
+    if (Platform.OS === 'web') {
+      // Web Speech API
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'id-ID';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = (event: any) => {
+          setIsListening(false);
+          setIsProcessing(false);
+          onListeningChange(false);
+          if (event.results && event.results[0] && event.results[0][0]) {
+            onVoiceResult(event.results[0][0].transcript);
+          }
+        };
+        recognition.onerror = (event: any) => {
+          setIsListening(false);
+          setIsProcessing(false);
+          setError('Voice error: ' + event.error);
+          onListeningChange(false);
+        };
+        recognition.onend = () => {
+          setIsListening(false);
+          setIsProcessing(false);
+          onListeningChange(false);
+        };
+        recognition.start();
+      } else {
+        // Fallback: Simulate
+        setTimeout(() => {
+          setIsListening(false);
+          setIsProcessing(true);
+          setTimeout(() => {
+            const randomResponse = VOICE_RESPONSES[Math.floor(Math.random() * VOICE_RESPONSES.length)];
+            onVoiceResult(randomResponse);
+            setIsProcessing(false);
+            onListeningChange(false);
+          }, 1000);
+        }, 3000);
+      }
+    } else {
+      // Mobile: Use react-native-voice
+      try {
+        await Voice.start('id-ID');
+      } catch (e: any) {
+        setIsListening(false);
         setIsProcessing(false);
+        setError('Voice error: ' + (e.message || 'Unknown error'));
         onListeningChange(false);
-      }, 1000);
-    }, 3000);
+      }
+    }
   };
 
-  const stopListening = () => {
+  // --- Stop Listening ---
+  const stopListening = async () => {
     setIsListening(false);
     setIsProcessing(false);
     onListeningChange(false);
+    if (Platform.OS === 'web') {
+      // Web Speech API: not needed, handled by onend
+    } else {
+      try {
+        await Voice.stop();
+      } catch {}
+    }
   };
 
   const toggleListening = () => {
@@ -113,12 +188,13 @@ export default function VoiceRecognition({
   };
 
   const getStatusText = () => {
+    if (error) return error;
     if (isProcessing) return 'Memproses...';
     if (isListening) return 'Mendengarkan...';
     return 'Tekan untuk berbicara';
   };
 
-  const getButtonColors = () => {
+  const getButtonColors = ():[string, string] => {
     if (isProcessing) return ['#F59E0B', '#FBBF24'];
     if (isListening) return ['#7C3AED', '#A855F7'];
     return ['#DC2626', '#EF4444'];
@@ -162,7 +238,7 @@ export default function VoiceRecognition({
       
       {Platform.OS === 'web' && (
         <Text style={styles.webNote}>
-          *Demo mode - Voice recognition simulasi
+          *Voice recognition aktif (Web Speech API jika tersedia, fallback simulasi)
         </Text>
       )}
     </View>
