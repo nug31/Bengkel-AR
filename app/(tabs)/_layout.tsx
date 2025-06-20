@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { View, Dimensions } from 'react-native';
 import { 
   Camera, 
   Mic, 
@@ -7,6 +7,8 @@ import {
   Settings, 
   Wrench 
 } from 'lucide-react-native';
+
+const { height } = Dimensions.get('window');
 
 export default function TabLayout() {
   return (
@@ -16,9 +18,9 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#1F2937',
           borderTopWidth: 0,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 10,
+          height: height * 0.09,
+          paddingBottom: height * 0.01,
+          paddingTop: height * 0.01,
         },
         tabBarActiveTintColor: '#DC2626',
         tabBarInactiveTintColor: '#9CA3AF',

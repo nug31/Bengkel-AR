@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +11,7 @@ import {
   Inter_700Bold
 } from '@expo-google-fonts/inter';
 import { SplashScreen } from 'expo-router';
+import { SafeAreaView } from 'react-native';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,12 +36,14 @@ export default function RootLayout() {
   }
 
   return (
-    <>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </>
+    <SafeAreaView style={{ flex: 1 }}>
+      <>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+      </>
+    </SafeAreaView>
   );
 }
